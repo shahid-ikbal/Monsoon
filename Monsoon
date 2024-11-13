@@ -1,0 +1,71 @@
+// Define the region of interest (Lahore, Pakistan)
+var lahore = ee.Geometry.Point([74.3587, 31.5204]).buffer(30000); // Buffer to include area around Lahore
+
+// Define the years of interest
+var startYear = 2010;
+var endYear = 2024;
+
+// Define monsoon months (June to September)
+var monsoonMonths = [6, 7, 8, 9];
+
+// Function to calculate and visualize monsoon rainfall for each year
+function getMonsoonRainfall(year) {
+  // Filter CHIRPS data for the given year and monsoon months
+  var rainfall = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY')
+                  .filter(ee.Filter.calendarRange(year, year, 'year'))
+                  .filter(ee.Filter.calendarRange(monsoonMonths[0], monsoonMonths[3], 'month'))
+                  .select('precipitation')
+                  .sum(); // Sum over the monsoon period
+
+  // Set visualization parameters for rainfall
+  var rainfallVis = {
+    min: 0,
+    max: 800, // Adjust max depending on observed rainfall range
+    palette: ['white', 'lightblue', 'blue', 'darkblue', 'purple']
+  };
+
+  // Add layer to the map for visualization
+  Map.addLayer(rainfall.clip(lahore), rainfallVis, 'Monsoon Rainfall ' + year.toString());
+}
+
+// Loop over each year and calculate monsoon rainfall
+for (var year = startYear; year <= endYear; year++) {
+  getMonsoonRainfall(year);
+}
+
+// Center map on Lahore
+Map.centerObject(lahore, 9);
+
+// Add a legend to the map
+var legend = ui.Panel({
+  style: {
+    position: 'bottom-left',
+    padding: '8px 15px'
+  }
+});
+
+// Legend title
+var legendTitle = ui.Label({
+  value: 'Monsoon Rainfall Intensity (mm)',
+  style: {fontWeight: 'bold', fontSize: '16px'}
+});
+legend.add(legendTitle);
+
+// Create the color bar for the legend
+var lon = ee.Image.pixelLonLat().select('latitude');
+var gradient = lon.multiply((800 - 0) / 100).add(0);
+var legendImage = gradient.visualize({min: 0, max: 800, palette: ['white', 'lightblue', 'blue', 'darkblue', 'purple']});
+
+// Add the color bar thumbnail to the legend panel
+legend.add(ui.Thumbnail({
+  image: legendImage,
+  params: {bbox: [0, 0, 1, 0.1], dimensions: '200x20'},
+  style: {stretch: 'horizontal', margin: '8px 0'}
+}));
+
+// Add min and max labels to the legend
+legend.add(ui.Label('0 mm', {margin: '4px 8px'}));
+legend.add(ui.Label('800 mm', {margin: '4px 8px', textAlign: 'right', stretch: 'horizontal'}));
+
+// Add the legend to the map
+Map.add(legend);
